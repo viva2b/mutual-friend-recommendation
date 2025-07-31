@@ -1,0 +1,78 @@
+version: '3.8'
+
+services:
+  # DynamoDB Local
+  dynamodb:
+    image: amazon/dynamodb-local:latest
+    container_name: mfs-dynamodb
+    ports:
+      - "8000:8000"
+    command: ["-jar", "DynamoDBLocal.jar", "-sharedDb", "-inMemory"]
+    working_dir: /home/dynamodblocal
+    networks:
+      - mfs-network
+
+  # RabbitMQ with Management UI
+  rabbitmq:
+    image: rabbitmq:3.12-management
+    container_name: mfs-rabbitmq
+    ports:
+      - "5672:5672"
+      - "15672:15672"
+    environment:
+      RABBITMQ_DEFAULT_USER: admin
+      RABBITMQ_DEFAULT_PASS: admin123
+    volumes:
+      - rabbitmq_data:/var/lib/rabbitmq
+    networks:
+      - mfs-network
+
+  # Elasticsearch
+  elasticsearch:
+    image: docker.elastic.co/elasticsearch/elasticsearch:8.11.0
+    container_name: mfs-elasticsearch
+    ports:
+      - "9200:9200"
+      - "9300:9300"
+    environment:
+      - discovery.type=single-node
+      - xpack.security.enabled=false
+      - "ES_JAVA_OPTS=-Xms512m -Xmx512m"
+    volumes:
+      - elasticsearch_data:/usr/share/elasticsearch/data
+    networks:
+      - mfs-network
+
+  # Redis
+  redis:
+    image: redis:7.2-alpine
+    container_name: mfs-redis
+    ports:
+      - "6379:6379"
+    command: redis-server --appendonly yes
+    volumes:
+      - redis_data:/data
+    networks:
+      - mfs-network
+
+  # Redis Commander (Redis Web UI)
+  redis-commander:
+    image: rediscommander/redis-commander:latest
+    container_name: mfs-redis-commander
+    ports:
+      - "8081:8081"
+    environment:
+      - REDIS_HOSTS=local:redis:6379
+    depends_on:
+      - redis
+    networks:
+      - mfs-network
+
+volumes:
+  rabbitmq_data:
+  elasticsearch_data:
+  redis_data:
+
+networks:
+  mfs-network:
+    driver: bridge

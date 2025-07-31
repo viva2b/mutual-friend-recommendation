@@ -1,0 +1,58 @@
+app:
+  name: "Mutual Friend System"
+  version: "1.0.0"
+  environment: ${APP_ENV:development}
+  port: ${APP_PORT:8080}
+
+log:
+  level: ${LOG_LEVEL:info}
+  format: json
+  output: stdout
+
+grpc:
+  port: ${GRPC_PORT:9090}
+  reflection: true
+
+dynamodb:
+  endpoint: ${DYNAMODB_ENDPOINT:http://localhost:8000}
+  region: ${DYNAMODB_REGION:us-east-1}
+  table_name: "MutualFriendSystem"
+
+rabbitmq:
+  url: ${RABBITMQ_URL:amqp://admin:admin123@localhost:5672/}
+  exchange:
+    name: ${RABBITMQ_EXCHANGE_NAME:friend-events}
+    type: "topic"
+    durable: true
+  queue:
+    name: ${RABBITMQ_QUEUE_NAME:friend-events-queue}
+    durable: true
+    routing_key: "friend.*"
+
+elasticsearch:
+  url: ${ELASTICSEARCH_URL:http://localhost:9200}
+  indices:
+    users: ${ELASTICSEARCH_INDEX_USERS:users}
+  bulk_size: 100
+  flush_interval: "5s"
+
+redis:
+  url: ${REDIS_URL:redis://localhost:6379}
+  password: ${REDIS_PASSWORD:""}
+  db: ${REDIS_DB:0}
+  pool_size: 10
+
+cache:
+  default_ttl: ${CACHE_TTL:3600s}
+  friend_list_ttl: ${FRIEND_LIST_CACHE_TTL:1800s}
+  recommendation_ttl: ${RECOMMENDATION_CACHE_TTL:7200s}
+
+batch:
+  size: ${BATCH_SIZE:1000}
+  timeout: ${BATCH_TIMEOUT:2s}
+  worker_count: ${BATCH_WORKER_COUNT:5}
+  
+recommendation:
+  max_results: 50
+  min_mutual_friends: 1
+  calculation_depth: 2
