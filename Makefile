@@ -18,7 +18,7 @@ install-deps: ## Install Go dependencies
 
 build: ## Build the application
 	go build -o bin/server cmd/server/main.go
-	go build -o bin/batch cmd/batch/main.go
+	go build -o bin/grpc-client cmd/grpc-client/main.go
 
 test: ## Run tests
 	go test -v ./...
@@ -57,6 +57,8 @@ proto-install: ## Install protoc and Go plugins
 proto: ## Generate protobuf files
 	protoc --go_out=. --go_opt=paths=source_relative \
 		--go-grpc_out=. --go-grpc_opt=paths=source_relative \
+		--plugin=protoc-gen-go=/Users/kimjaehyun/go/bin/protoc-gen-go \
+		--plugin=protoc-gen-go-grpc=/Users/kimjaehyun/go/bin/protoc-gen-go-grpc \
 		api/proto/*.proto
 
 dev: docker-up ## Start development environment
@@ -89,5 +91,8 @@ test-db: ## Test DynamoDB setup and data
 
 test-query: ## Query and analyze DynamoDB data
 	go run cmd/query/main.go
+
+test-grpc: ## Test gRPC client
+	go run cmd/grpc-client/main.go
 
 .DEFAULT_GOAL := help
