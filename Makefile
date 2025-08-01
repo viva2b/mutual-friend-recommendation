@@ -63,6 +63,7 @@ dev: docker-up ## Start development environment
 	@echo "Development environment started!"
 	@echo "Services:"
 	@echo "  - DynamoDB: http://localhost:8000"
+	@echo "  - DynamoDB Admin: http://localhost:8001"
 	@echo "  - RabbitMQ Management: http://localhost:15672 (admin/admin123)"
 	@echo "  - Elasticsearch: http://localhost:9200"
 	@echo "  - Redis: localhost:6379"
@@ -79,5 +80,14 @@ run-server: ## Run the gRPC server
 
 run-batch: ## Run the batch processor
 	go run cmd/batch/main.go
+
+test-events: ## Test RabbitMQ event publishing
+	go run cmd/test-events/main.go
+
+test-db: ## Test DynamoDB setup and data
+	go run cmd/setup/main.go
+
+test-query: ## Query and analyze DynamoDB data
+	go run cmd/query/main.go
 
 .DEFAULT_GOAL := help

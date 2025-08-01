@@ -69,6 +69,7 @@ make dev
 
 ### 3. 서비스 접속 정보
 - **DynamoDB**: http://localhost:8000
+- **DynamoDB Admin**: http://localhost:8001
 - **RabbitMQ Management**: http://localhost:15672 (admin/admin123)
 - **Elasticsearch**: http://localhost:9200
 - **Redis**: localhost:6379
