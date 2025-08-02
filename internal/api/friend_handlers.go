@@ -280,6 +280,107 @@ func (s *FriendServiceServer) GetRecommendations(
 	return status.Errorf(codes.Unimplemented, "recommendations feature not yet implemented")
 }
 
+// SearchUsers implements the SearchUsers RPC method
+func (s *FriendServiceServer) SearchUsers(
+	req *pb.SearchUsersRequest,
+	stream grpc.ServerStreamingServer[pb.SearchUsersResponse],
+) error {
+	// Validate request
+	if err := validateSearchUsersRequest(req); err != nil {
+		return status.Errorf(codes.InvalidArgument, "invalid request: %v", err)
+	}
+
+	log.Printf("Searching users with query: '%s' (limit: %d)", req.Query, req.Limit)
+
+	// Extract current user ID from context (in real implementation, this would come from authentication)
+	currentUserID := "current-user-id" // Placeholder
+
+	// Call search service
+	results, nextPageToken, totalCount, err := s.searchService.SearchUsers(stream.Context(), req, currentUserID)
+	if err != nil {
+		log.Printf("Failed to search users: %v", err)
+		return status.Errorf(codes.Internal, "search failed: %v", err)
+	}
+
+	// Stream results back to client
+	for i, result := range results {
+		response := &pb.SearchUsersResponse{
+			User: result,
+		}
+
+		// Include metadata in first response
+		if i == 0 {
+			response.TotalCount = totalCount
+			response.Metadata = &pb.SearchMetadata{
+				TookMs:            100, // Placeholder
+				TimedOut:          false,
+				QueryExplanation:  fmt.Sprintf("Search for: %s", req.Query),
+			}
+		}
+
+		// Include next page token in last response
+		if i == len(results)-1 && nextPageToken != "" {
+			response.NextPageToken = nextPageToken
+		}
+
+		// Send to client
+		if err := stream.Send(response); err != nil {
+			log.Printf("Failed to send search response: %v", err)
+			return status.Errorf(codes.Internal, "failed to send response: %v", err)
+		}
+	}
+
+	log.Printf("Successfully streamed %d search results", len(results))
+	return nil
+}
+
+// GetUserSuggestions implements the GetUserSuggestions RPC method
+func (s *FriendServiceServer) GetUserSuggestions(
+	req *pb.GetUserSuggestionsRequest,
+	stream grpc.ServerStreamingServer[pb.GetUserSuggestionsResponse],
+) error {
+	// Validate request
+	if err := validateGetUserSuggestionsRequest(req); err != nil {
+		return status.Errorf(codes.InvalidArgument, "invalid request: %v", err)
+	}
+
+	log.Printf("Getting user suggestions for user: %s (type: %s, limit: %d)", 
+		req.UserId, req.SuggestionType, req.Limit)
+
+	// Call search service
+	suggestions, nextPageToken, totalCount, err := s.searchService.GetUserSuggestions(stream.Context(), req)
+	if err != nil {
+		log.Printf("Failed to get user suggestions: %v", err)
+		return status.Errorf(codes.Internal, "suggestions failed: %v", err)
+	}
+
+	// Stream suggestions back to client
+	for i, suggestion := range suggestions {
+		response := &pb.GetUserSuggestionsResponse{
+			Suggestion: suggestion,
+		}
+
+		// Include metadata in first response
+		if i == 0 {
+			response.TotalCount = totalCount
+		}
+
+		// Include next page token in last response
+		if i == len(suggestions)-1 && nextPageToken != "" {
+			response.NextPageToken = nextPageToken
+		}
+
+		// Send to client
+		if err := stream.Send(response); err != nil {
+			log.Printf("Failed to send suggestion response: %v", err)
+			return status.Errorf(codes.Internal, "failed to send response: %v", err)
+		}
+	}
+
+	log.Printf("Successfully streamed %d user suggestions", len(suggestions))
+	return nil
+}
+
 // Validation functions
 func validateAddFriendRequest(req *pb.AddFriendRequest) error {
 	if req.UserId == "" {
@@ -352,6 +453,29 @@ func validateGetMutualFriendsRequest(req *pb.GetMutualFriendsRequest) error {
 	}
 	if req.Limit > 100 {
 		return fmt.Errorf("limit cannot exceed 100")
+	}
+	return nil
+}
+
+func validateSearchUsersRequest(req *pb.SearchUsersRequest) error {
+	if req.Limit < 0 {
+		return fmt.Errorf("limit cannot be negative")
+	}
+	if req.Limit > 50 {
+		return fmt.Errorf("limit cannot exceed 50")
+	}
+	return nil
+}
+
+func validateGetUserSuggestionsRequest(req *pb.GetUserSuggestionsRequest) error {
+	if req.UserId == "" {
+		return fmt.Errorf("user_id is required")
+	}
+	if req.Limit < 0 {
+		return fmt.Errorf("limit cannot be negative")
+	}
+	if req.Limit > 20 {
+		return fmt.Errorf("limit cannot exceed 20")
 	}
 	return nil
 }

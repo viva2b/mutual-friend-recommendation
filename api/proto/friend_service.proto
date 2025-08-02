@@ -30,6 +30,12 @@ service FriendService {
   // Get friend recommendations (will be implemented in later phases)
   rpc GetRecommendations(GetRecommendationsRequest) returns (stream GetRecommendationsResponse);
   
+  // Search users
+  rpc SearchUsers(SearchUsersRequest) returns (stream SearchUsersResponse);
+  
+  // Get user suggestions
+  rpc GetUserSuggestions(GetUserSuggestionsRequest) returns (stream GetUserSuggestionsResponse);
+  
   // Health check
   rpc HealthCheck(google.protobuf.Empty) returns (HealthCheckResponse);
 }
@@ -158,6 +164,92 @@ message HealthCheckResponse {
   string status = 1; // "SERVING" or "NOT_SERVING"
   string message = 2;
   google.protobuf.Timestamp timestamp = 3;
+}
+
+// Request/Response messages for SearchUsers
+message SearchUsersRequest {
+  string query = 1;                    // Search query
+  int32 limit = 2;                     // Default: 20, Max: 50
+  string page_token = 3;               // For pagination
+  SearchFilters filters = 4;           // Advanced filters
+  SortOptions sort = 5;                // Sorting options
+  bool include_highlights = 6;         // Whether to include search highlights
+}
+
+message SearchFilters {
+  repeated string locations = 1;        // Filter by location
+  repeated string interests = 2;        // Filter by interests
+  int32 min_mutual_friends = 3;        // Minimum mutual friend count
+  int32 max_mutual_friends = 4;        // Maximum mutual friend count
+  bool exclude_friends = 5;            // Exclude existing friends
+  bool only_mutual_friends = 6;       // Only show users with mutual friends
+  int32 min_friend_count = 7;         // Minimum friend count
+  int32 max_friend_count = 8;         // Maximum friend count
+}
+
+message SortOptions {
+  enum SortField {
+    RELEVANCE = 0;
+    MUTUAL_FRIENDS = 1;
+    CREATED_AT = 2;
+    FRIEND_COUNT = 3;
+    ACTIVITY_SCORE = 4;
+  }
+  SortField field = 1;
+  bool descending = 2;
+}
+
+message SearchUsersResponse {
+  UserSearchResult user = 1;
+  string next_page_token = 2;          // Empty if no more results
+  int32 total_count = 3;               // Total number of results (only in first response)
+  SearchMetadata metadata = 4;         // Search metadata (only in first response)
+}
+
+message UserSearchResult {
+  User user = 1;
+  float relevance_score = 2;           // Search relevance score
+  int32 mutual_friend_count = 3;       // Number of mutual friends
+  repeated string mutual_friend_ids = 4; // IDs of mutual friends (limited)
+  string highlight = 5;                // Search result highlighting
+  SocialMetrics social_metrics = 6;    // Social metrics for ranking
+}
+
+message SocialMetrics {
+  int32 friend_count = 1;
+  int32 mutual_friend_count = 2;
+  float popularity_score = 3;
+  float activity_score = 4;
+  float response_rate = 5;
+}
+
+message SearchMetadata {
+  int32 took_ms = 1;                   // Search time in milliseconds
+  bool timed_out = 2;                  // Whether search timed out
+  string query_explanation = 3;        // Query explanation for debugging
+}
+
+// Request/Response messages for GetUserSuggestions
+message GetUserSuggestionsRequest {
+  string user_id = 1;                  // User requesting suggestions
+  int32 limit = 2;                     // Default: 10, Max: 20
+  string suggestion_type = 3;          // Type of suggestion (interest_based, mutual_friends, location_based)
+  bool include_user_info = 4;          // Whether to include full user info
+}
+
+message GetUserSuggestionsResponse {
+  UserSuggestion suggestion = 1;
+  string next_page_token = 2;
+  int32 total_count = 3;
+}
+
+message UserSuggestion {
+  User user = 1;
+  float suggestion_score = 2;          // Suggestion relevance score
+  string reason = 3;                   // Why this user was suggested
+  repeated string shared_interests = 4; // Shared interests
+  int32 mutual_friend_count = 5;       // Number of mutual friends
+  SocialMetrics social_metrics = 6;    // Social metrics
 }
 
 // Error handling
