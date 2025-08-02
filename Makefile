@@ -98,4 +98,19 @@ test-grpc: ## Test gRPC client
 test-consumer: ## Test RabbitMQ event consumer
 	go run cmd/test-consumer/main.go
 
+test-redis: ## Test Redis cache layer
+	go run cmd/test-redis/main.go
+
+test-friend-cache: ## Test friend service caching functionality
+	go run cmd/test-friend-cache/main.go
+
+test-cache-integration: ## Test cache integration patterns
+	go run cmd/test-cache-integration/main.go
+
+test-cache-performance: ## Run comprehensive cache performance tests
+	go run cmd/test-cache-performance/main.go
+
+test-cache-performance-quiet: ## Run comprehensive cache performance tests (quiet mode)
+	go run cmd/test-cache-performance-quiet/main.go
+
 .DEFAULT_GOAL := help
