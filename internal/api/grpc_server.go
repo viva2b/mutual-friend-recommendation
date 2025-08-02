@@ -17,6 +17,7 @@ import (
 	"google.golang.org/protobuf/types/known/timestamppb"
 
 	pb "mutual-friend/api/proto"
+	"mutual-friend/internal/search"
 	"mutual-friend/internal/service"
 	"mutual-friend/pkg/config"
 )
@@ -26,6 +27,7 @@ type FriendServiceServer struct {
 	pb.UnimplementedFriendServiceServer
 	friendService *service.FriendService
 	eventService  *service.EventService
+	searchService *search.SearchService
 	config        *config.Config
 }
 
@@ -33,11 +35,13 @@ type FriendServiceServer struct {
 func NewFriendServiceServer(
 	friendService *service.FriendService,
 	eventService *service.EventService,
+	searchService *search.SearchService,
 	config *config.Config,
 ) *FriendServiceServer {
 	return &FriendServiceServer{
 		friendService: friendService,
 		eventService:  eventService,
+		searchService: searchService,
 		config:        config,
 	}
 }
@@ -55,6 +59,7 @@ func NewGRPCServer(
 	config *config.Config,
 	friendService *service.FriendService,
 	eventService *service.EventService,
+	searchService *search.SearchService,
 ) (*GRPCServer, error) {
 	// Create listener
 	lis, err := net.Listen("tcp", fmt.Sprintf(":%d", config.GRPC.Port))
@@ -71,7 +76,7 @@ func NewGRPCServer(
 	)
 
 	// Create friend service handler
-	friendHandler := NewFriendServiceServer(friendService, eventService, config)
+	friendHandler := NewFriendServiceServer(friendService, eventService, searchService, config)
 
 	// Register services
 	pb.RegisterFriendServiceServer(server, friendHandler)
