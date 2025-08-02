@@ -3,7 +3,6 @@ package search
 import (
 	"context"
 	"encoding/json"
-	"fmt"
 	"log"
 	"sort"
 	"strings"
