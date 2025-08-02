@@ -8,9 +8,13 @@ import (
 	"syscall"
 
 	"mutual-friend/internal/api"
+	"mutual-friend/internal/cache"
 	"mutual-friend/internal/repository"
+	"mutual-friend/internal/search"
 	"mutual-friend/internal/service"
 	"mutual-friend/pkg/config"
+	"mutual-friend/pkg/elasticsearch"
+	"mutual-friend/pkg/redis"
 )
 
 func main() {
@@ -38,6 +42,37 @@ func main() {
 	userRepo := repository.NewUserRepository(dynamoClient)
 	friendRepo := repository.NewFriendRepository(dynamoClient)
 
+	// Initialize Redis client
+	log.Println("Initializing Redis client...")
+	redisConfig := &redis.Config{
+		Host:     "localhost",
+		Port:     6379,
+		Password: cfg.Redis.Password,
+		DB:       cfg.Redis.DB,
+		PoolSize: cfg.Redis.PoolSize,
+	}
+	redisClient, err := redis.NewClient(redisConfig)
+	if err != nil {
+		log.Fatalf("Failed to create Redis client: %v", err)
+	}
+
+	// Initialize cache service
+	log.Println("Initializing cache service...")
+	cacheService := cache.NewService(redisClient)
+
+	// Initialize Elasticsearch client
+	log.Println("Initializing Elasticsearch client...")
+	esConfig := elasticsearch.Config{
+		Addresses: []string{cfg.Elasticsearch.URL},
+	}
+	esClient, err := elasticsearch.NewClient(esConfig)
+	if err != nil {
+		log.Fatalf("Failed to create Elasticsearch client: %v", err)
+	}
+
+	// Initialize search service
+	searchService := search.NewSearchService(esClient)
+
 	// Initialize event service
 	log.Println("Initializing event service...")
 	eventService, err := service.NewEventService(cfg)
@@ -51,11 +86,11 @@ func main() {
 	}
 
 	// Initialize friend service
-	friendService := service.NewFriendService(friendRepo, userRepo, eventService)
+	friendService := service.NewFriendService(friendRepo, userRepo, eventService, cacheService)
 
 	// Initialize gRPC server
 	log.Println("Initializing gRPC server...")
-	grpcServer, err := api.NewGRPCServer(cfg, friendService, eventService)
+	grpcServer, err := api.NewGRPCServer(cfg, friendService, eventService, searchService)
 	if err != nil {
 		log.Fatalf("Failed to create gRPC server: %v", err)
 	}

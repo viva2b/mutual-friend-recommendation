@@ -3,7 +3,6 @@ package search
 import (
 	"context"
 	"encoding/base64"
-	"encoding/json"
 	"fmt"
 	"log"
 	"strconv"
@@ -497,7 +496,7 @@ func (ss *SearchService) convertSearchHitToResult(hit elasticsearch.SearchHit, i
 	userID, _ := hit.Source["user_id"].(string)
 	username, _ := hit.Source["username"].(string)
 	displayName, _ := hit.Source["display_name"].(string)
-	bio, _ := hit.Source["bio"].(string)
+	_, _ = hit.Source["bio"].(string)
 	
 	// Parse social metrics
 	var socialMetrics *pb.SocialMetrics

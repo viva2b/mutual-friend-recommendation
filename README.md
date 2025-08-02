@@ -30,21 +30,40 @@
 
 ```
 mutual-friend/
-├── cmd/                    # 애플리케이션 엔트리포인트
-│   ├── server/            # gRPC 서버
-│   └── batch/             # 배치 처리 애플리케이션
-├── internal/              # 내부 비즈니스 로직
-│   ├── api/               # gRPC API 구현
-│   ├── batch/             # 배치 처리 로직
-│   ├── domain/            # 도메인 모델
-│   ├── repository/        # 데이터 액세스 계층
-│   └── service/           # 비즈니스 서비스
-├── pkg/                   # 공통 유틸리티
-│   ├── config/            # 설정 관리
-│   └── logger/            # 로깅
-├── configs/               # 설정 파일
-├── deployments/           # 배포 관련 파일
-└── scripts/               # 유틸리티 스크립트
+├── cmd/                          # 실행 가능한 애플리케이션
+│   ├── server/                   # 메인 gRPC 서버
+│   ├── setup/                    # 데이터베이스 초기화
+│   ├── comprehensive-test/       # 통합 gRPC API 테스트
+│   ├── elasticsearch-*/          # Elasticsearch 설정 및 고급 테스트
+│   ├── test-client/              # 기본 클라이언트 테스트
+│   ├── test-cache-*/             # 캐시 성능 및 통합 테스트
+│   ├── grpc-client/              # gRPC 클라이언트 도구
+│   ├── search-benchmark/         # 검색 성능 벤치마크
+│   └── query/                    # 데이터 쿼리 도구
+├── internal/                     # 프라이빗 애플리케이션 코드
+│   ├── api/                      # gRPC API 핸들러
+│   ├── service/                  # 비즈니스 로직
+│   ├── repository/               # 데이터 접근 계층
+│   ├── search/                   # Elasticsearch 검색 서비스
+│   ├── cache/                    # 캐시 서비스
+│   └── domain/                   # 도메인 엔티티
+├── pkg/                          # 재사용 가능한 라이브러리
+│   ├── config/                   # 설정 관리
+│   ├── cache/                    # 캐시 인터페이스 및 타입
+│   ├── events/                   # 이벤트 시스템
+│   ├── redis/                    # Redis 클라이언트
+│   ├── elasticsearch/            # Elasticsearch 클라이언트
+│   └── rabbitmq/                 # RabbitMQ 클라이언트
+├── tests/                        # 종합 테스트 스위트 (8개 카테고리)
+│   ├── integration/              # 통합 테스트
+│   ├── performance/              # 성능 테스트
+│   ├── stress/                   # 스트레스 테스트
+│   ├── concurrency/              # 동시성 테스트
+│   ├── consistency/              # 일관성 테스트
+│   ├── architecture/             # 아키텍처 테스트
+│   └── optimization/             # 최적화 테스트
+├── scripts/                      # 자동화 스크립트
+└── configs/                      # 설정 파일들
 ```
 
 ## 개발 환경 설정
