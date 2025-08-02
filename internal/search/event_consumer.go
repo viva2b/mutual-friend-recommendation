@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"log"
+	"strings"
 	"time"
 
 	"mutual-friend/pkg/events"
@@ -54,18 +55,18 @@ func (ec *EventConsumer) Start(ctx context.Context) error {
 // setupQueue creates the queue and bindings for search index updates
 func (ec *EventConsumer) setupQueue(ctx context.Context) error {
 	// Declare exchange if not exists
-	err := ec.rabbitmqClient.DeclareExchange("friend-events", "topic", true, false, false, false, nil)
+	err := ec.rabbitmqClient.DeclareExchange("friend-events", "topic", true, false)
 	if err != nil {
 		return fmt.Errorf("failed to declare exchange: %w", err)
 	}
 	
-	err = ec.rabbitmqClient.DeclareExchange("user-events", "topic", true, false, false, false, nil)
+	err = ec.rabbitmqClient.DeclareExchange("user-events", "topic", true, false)
 	if err != nil {
 		return fmt.Errorf("failed to declare user-events exchange: %w", err)
 	}
 	
 	// Declare queue
-	_, err = ec.rabbitmqClient.DeclareQueue(ec.queueName, true, false, false, false, nil)
+	err = ec.rabbitmqClient.DeclareQueue(ec.queueName, true, false, false)
 	if err != nil {
 		return fmt.Errorf("failed to declare queue: %w", err)
 	}
@@ -82,7 +83,7 @@ func (ec *EventConsumer) setupQueue(ctx context.Context) error {
 	}
 	
 	for _, binding := range bindings {
-		err = ec.rabbitmqClient.BindQueue(ec.queueName, binding.routingKey, binding.exchange, false, nil)
+		err = ec.rabbitmqClient.BindQueue(ec.queueName, binding.exchange, binding.routingKey)
 		if err != nil {
 			return fmt.Errorf("failed to bind queue to %s with key %s: %w", 
 				binding.exchange, binding.routingKey, err)
@@ -93,24 +94,118 @@ func (ec *EventConsumer) setupQueue(ctx context.Context) error {
 	return nil
 }
 
-// processMessages processes incoming messages
+// processMessages processes incoming messages with enhanced error handling
 func (ec *EventConsumer) processMessages(ctx context.Context, deliveries <-chan rabbitmq.Delivery) {
+	maxRetries := 3
+	retryDelay := time.Second * 2
+	
 	for {
 		select {
 		case <-ctx.Done():
 			log.Printf("Search index event consumer stopped")
 			return
 		case delivery := <-deliveries:
-			if err := ec.processMessage(ctx, delivery); err != nil {
-				log.Printf("Failed to process message: %v", err)
-				// Nack message to retry later
-				delivery.Nack(false, true)
+			err := ec.processMessageWithRetry(ctx, delivery, maxRetries, retryDelay)
+			if err != nil {
+				log.Printf("Failed to process message after %d retries: %v", maxRetries, err)
+				// Send to dead letter queue or log for manual inspection
+				ec.handleFailedMessage(delivery, err)
+				delivery.Nack(false, false) // Don't requeue after max retries
 			} else {
 				// Ack message
 				delivery.Ack(false)
 			}
 		}
 	}
+}
+
+// processMessageWithRetry processes a message with retry logic
+func (ec *EventConsumer) processMessageWithRetry(ctx context.Context, delivery rabbitmq.Delivery, maxRetries int, retryDelay time.Duration) error {
+	var lastErr error
+	
+	for attempt := 0; attempt < maxRetries; attempt++ {
+		if attempt > 0 {
+			// Wait before retry
+			select {
+			case <-ctx.Done():
+				return ctx.Err()
+			case <-time.After(retryDelay * time.Duration(attempt)):
+				// Continue with retry
+			}
+		}
+		
+		err := ec.processMessage(ctx, delivery)
+		if err == nil {
+			if attempt > 0 {
+				log.Printf("Message processed successfully on attempt %d", attempt+1)
+			}
+			return nil
+		}
+		
+		lastErr = err
+		log.Printf("Message processing failed (attempt %d/%d): %v", attempt+1, maxRetries, err)
+		
+		// Check if error is retryable
+		if !ec.isRetryableError(err) {
+			log.Printf("Non-retryable error encountered: %v", err)
+			return err
+		}
+	}
+	
+	return fmt.Errorf("message processing failed after %d attempts: %w", maxRetries, lastErr)
+}
+
+// isRetryableError determines if an error is worth retrying
+func (ec *EventConsumer) isRetryableError(err error) bool {
+	errStr := err.Error()
+	
+	// Network related errors are usually retryable
+	retryableErrors := []string{
+		"connection refused",
+		"timeout",
+		"temporary failure",
+		"service unavailable",
+		"too many requests",
+	}
+	
+	for _, retryable := range retryableErrors {
+		if strings.Contains(strings.ToLower(errStr), retryable) {
+			return true
+		}
+	}
+	
+	// JSON unmarshaling errors are usually not retryable
+	if strings.Contains(errStr, "unmarshal") || strings.Contains(errStr, "json") {
+		return false
+	}
+	
+	// Default to retryable for unknown errors
+	return true
+}
+
+// handleFailedMessage handles messages that failed after all retries
+func (ec *EventConsumer) handleFailedMessage(delivery rabbitmq.Delivery, err error) {
+	// Log the failed message for manual inspection
+	log.Printf("FAILED MESSAGE - Routing Key: %s, Body: %s, Error: %v", 
+		delivery.RoutingKey, string(delivery.Body), err)
+	
+	// In a production system, you might want to:
+	// 1. Send to a dead letter queue
+	// 2. Store in a database for later processing
+	// 3. Send alerts to monitoring systems
+	// 4. Write to a file for manual inspection
+	
+	// For now, we'll just log it
+	failureData := map[string]interface{}{
+		"timestamp":   time.Now(),
+		"routing_key": delivery.RoutingKey,
+		"message":     string(delivery.Body),
+		"error":       err.Error(),
+		"headers":     delivery.Headers,
+	}
+	
+	// This could be enhanced to write to a failure log file or database
+	log.Printf("FAILURE_LOG: %+v", failureData)
 }
 
 // processMessage processes a single message
@@ -137,11 +232,11 @@ func (ec *EventConsumer) processFriendEvent(ctx context.Context, delivery rabbit
 	}
 	
 	log.Printf("Processing friend event: %s for users %s <-> %s", 
-		event.EventType, event.UserID, event.FriendID)
+		event.Type, event.UserID, event.FriendID)
 	
 	// Update social metrics for both users involved
-	switch event.EventType {
-	case events.EventFriendAdded:
+	switch event.Type {
+	case events.EventTypeFriendAdded:
 		// Increment friend count for both users
 		if err := ec.updateFriendCount(ctx, event.UserID, 1); err != nil {
 			log.Printf("Failed to update friend count for user %s: %v", event.UserID, err)
@@ -156,7 +251,7 @@ func (ec *EventConsumer) processFriendEvent(ctx context.Context, delivery rabbit
 			log.Printf("Failed to update mutual friend counts: %v", err)
 		}
 		
-	case events.EventFriendRemoved:
+	case events.EventTypeFriendRemoved:
 		// Decrement friend count for both users
 		if err := ec.updateFriendCount(ctx, event.UserID, -1); err != nil {
 			log.Printf("Failed to update friend count for user %s: %v", event.UserID, err)
@@ -181,22 +276,52 @@ func (ec *EventConsumer) processUserEvent(ctx context.Context, delivery rabbitmq
 		return fmt.Errorf("failed to unmarshal user event: %w", err)
 	}
 	
-	log.Printf("Processing user event: %s for user %s", event.EventType, event.UserID)
+	log.Printf("Processing user event: %s for user %s", event.Type, event.UserID)
 	
-	switch event.EventType {
-	case events.EventUserCreated:
+	switch event.Type {
+	case events.EventTypeUserCreated:
 		// Index new user
-		if event.UserData != nil {
-			// In a real implementation, we would convert the event data to a User struct
-			// For now, we'll just log it
-			log.Printf("New user created: %s", event.UserID)
+		if event.Username != "" || event.DisplayName != "" {
+			// Convert event to user document for indexing
+			userDoc := map[string]interface{}{
+				"user_id":      event.UserID,
+				"username":     event.Username,
+				"display_name": event.DisplayName,
+				"email":        event.Email,
+				"social_metrics": map[string]interface{}{
+					"friend_count":       0,
+					"mutual_friend_count": 0,
+				},
+				"created_at": event.Timestamp,
+				"updated_at": event.Timestamp,
+			}
+			
+			// Index the user document
+			if err := ec.userIndexer.IndexUserFromEvent(ctx, event.UserID, userDoc); err != nil {
+				return fmt.Errorf("failed to index new user %s: %w", event.UserID, err)
+			}
+			
+			log.Printf("Successfully indexed new user: %s", event.UserID)
 		}
 		
-	case events.EventUserUpdated:
+	case events.EventTypeUserUpdated:
 		// Update existing user
-		if event.UserData != nil {
-			log.Printf("User updated: %s", event.UserID)
-			// In a real implementation, we would update the user document
+		if event.Username != "" || event.DisplayName != "" {
+			updateDoc := map[string]interface{}{
+				"doc": map[string]interface{}{
+					"username":     event.Username,
+					"display_name": event.DisplayName,
+					"email":        event.Email,
+					"updated_at":   event.Timestamp,
+				},
+			}
+			
+			// Update the user document
+			if err := ec.userIndexer.UpdateUserFromEvent(ctx, event.UserID, updateDoc); err != nil {
+				return fmt.Errorf("failed to update user %s: %w", event.UserID, err)
+			}
+			
+			log.Printf("Successfully updated user: %s", event.UserID)
 		}
 	}
 	

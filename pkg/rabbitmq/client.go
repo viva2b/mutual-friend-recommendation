@@ -10,6 +10,9 @@ import (
 	amqp "github.com/rabbitmq/amqp091-go"
 )
 
+// Delivery is an alias for amqp.Delivery to avoid exposing internal types
+type Delivery = amqp.Delivery
+
 // Client represents a RabbitMQ client
 type Client struct {
 	conn       *amqp.Connection
@@ -216,7 +219,7 @@ func (c *Client) Publish(ctx context.Context, exchange, routingKey string, body 
 }
 
 // Consume starts consuming messages from a queue
-func (c *Client) Consume(queueName, consumerTag string) (<-chan amqp.Delivery, error) {
+func (c *Client) Consume(queueName, consumerTag string, autoAck bool) (<-chan Delivery, error) {
 	c.mu.RLock()
 	defer c.mu.RUnlock()
 
@@ -227,7 +230,7 @@ func (c *Client) Consume(queueName, consumerTag string) (<-chan amqp.Delivery, e
 	msgs, err := c.channel.Consume(
 		queueName,   // queue
 		consumerTag, // consumer
-		false,       // auto-ack (we'll ack manually)
+		autoAck,     // auto-ack
 		false,       // exclusive
 		false,       // no-local
 		false,       // no-wait

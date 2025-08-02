@@ -223,6 +223,28 @@ func (ui *UserIndexer) extractInterestsFromBio(bio string) []string {
 	return interests
 }
 
+// IndexUserFromEvent indexes a user document from event data
+func (ui *UserIndexer) IndexUserFromEvent(ctx context.Context, userID string, document interface{}) error {
+	err := ui.esClient.IndexDocument(ctx, "users", userID, document)
+	if err != nil {
+		return fmt.Errorf("failed to index user %s from event: %w", userID, err)
+	}
+	
+	log.Printf("Successfully indexed user from event: %s", userID)
+	return nil
+}
+
+// UpdateUserFromEvent updates a user document from event data
+func (ui *UserIndexer) UpdateUserFromEvent(ctx context.Context, userID string, updateDoc interface{}) error {
+	err := ui.esClient.UpdateDocument(ctx, "users", userID, updateDoc)
+	if err != nil {
+		return fmt.Errorf("failed to update user %s from event: %w", userID, err)
+	}
+	
+	log.Printf("Successfully updated user from event: %s", userID)
+	return nil
+}
+
 // ReindexAllUsers re-indexes all users (useful for mapping changes)
 func (ui *UserIndexer) ReindexAllUsers(ctx context.Context, users []*domain.User) error {
 	// Delete existing index and recreate

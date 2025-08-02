@@ -52,10 +52,10 @@ func (p *Publisher) SetupExchangeAndQueues(ctx context.Context) error {
 
 	// Declare queues and bind them to exchange
 	queues := map[string][]string{
-		"friend-events":         {"FRIEND_ADDED.*", "FRIEND_REMOVED.*"},
-		"user-events":          {"USER_CREATED.*", "USER_UPDATED.*", "USER_DELETED.*"},
-		"recommendation-events": {"RECOMMENDATION_GENERATED.*", "RECOMMENDATION_UPDATED.*"},
-		"elasticsearch-sync":   {"USER_CREATED.*", "USER_UPDATED.*", "FRIEND_ADDED.*", "FRIEND_REMOVED.*"},
+		"friend-events":         {"friend.added", "friend.removed"},
+		"user-events":          {"user.created", "user.updated", "user.deleted"},
+		"recommendation-events": {"recommendation.generated", "recommendation.updated"},
+		"search-index-queue":   {"user.created", "user.updated", "friend.added", "friend.removed"},
 		"analytics":           {"#"}, // Catch all events for analytics
 	}
 
