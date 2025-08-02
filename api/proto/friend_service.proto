@@ -1,0 +1,168 @@
+syntax = "proto3";
+
+package friend;
+
+option go_package = "mutual-friend/pkg/proto";
+
+import "google/protobuf/timestamp.proto";
+import "google/protobuf/empty.proto";
+
+// Friend service definition
+service FriendService {
+  // Add a friend relationship
+  rpc AddFriend(AddFriendRequest) returns (AddFriendResponse);
+  
+  // Remove a friend relationship
+  rpc RemoveFriend(RemoveFriendRequest) returns (RemoveFriendResponse);
+  
+  // Get friends list with server streaming
+  rpc GetFriends(GetFriendsRequest) returns (stream GetFriendsResponse);
+  
+  // Get friend count
+  rpc GetFriendCount(GetFriendCountRequest) returns (GetFriendCountResponse);
+  
+  // Check if two users are friends
+  rpc AreFriends(AreFriendsRequest) returns (AreFriendsResponse);
+  
+  // Get mutual friends between two users
+  rpc GetMutualFriends(GetMutualFriendsRequest) returns (stream GetMutualFriendsResponse);
+  
+  // Get friend recommendations (will be implemented in later phases)
+  rpc GetRecommendations(GetRecommendationsRequest) returns (stream GetRecommendationsResponse);
+  
+  // Health check
+  rpc HealthCheck(google.protobuf.Empty) returns (HealthCheckResponse);
+}
+
+// Common message types
+message User {
+  string user_id = 1;
+  string username = 2;
+  string email = 3;
+  string display_name = 4;
+  google.protobuf.Timestamp created_at = 5;
+  google.protobuf.Timestamp updated_at = 6;
+}
+
+message Friend {
+  string user_id = 1;
+  string friend_id = 2;
+  google.protobuf.Timestamp created_at = 3;
+  User friend_info = 4; // Optional user information
+}
+
+message MutualFriend {
+  string friend_id = 1;
+  User friend_info = 2;
+  int32 mutual_count = 3; // Number of mutual connections
+}
+
+message Recommendation {
+  string user_id = 1;
+  User user_info = 2;
+  int32 mutual_friend_count = 3;
+  double score = 4;
+  string reason = 5;
+}
+
+// Request/Response messages for AddFriend
+message AddFriendRequest {
+  string user_id = 1;
+  string friend_id = 2;
+}
+
+message AddFriendResponse {
+  bool success = 1;
+  string message = 2;
+  Friend friendship = 3;
+}
+
+// Request/Response messages for RemoveFriend
+message RemoveFriendRequest {
+  string user_id = 1;
+  string friend_id = 2;
+}
+
+message RemoveFriendResponse {
+  bool success = 1;
+  string message = 2;
+}
+
+// Request/Response messages for GetFriends
+message GetFriendsRequest {
+  string user_id = 1;
+  int32 limit = 2; // Default: 50, Max: 100
+  string page_token = 3; // For pagination
+  bool include_user_info = 4; // Whether to include friend's user info
+}
+
+message GetFriendsResponse {
+  Friend friend = 1;
+  string next_page_token = 2; // Empty if no more results
+  int32 total_count = 3; // Total number of friends (only in first response)
+}
+
+// Request/Response messages for GetFriendCount
+message GetFriendCountRequest {
+  string user_id = 1;
+}
+
+message GetFriendCountResponse {
+  string user_id = 1;
+  int32 count = 2;
+}
+
+// Request/Response messages for AreFriends
+message AreFriendsRequest {
+  string user_id = 1;
+  string friend_id = 2;
+}
+
+message AreFriendsResponse {
+  bool are_friends = 1;
+  google.protobuf.Timestamp friendship_created_at = 2; // If they are friends
+}
+
+// Request/Response messages for GetMutualFriends
+message GetMutualFriendsRequest {
+  string user_id = 1;
+  string other_user_id = 2;
+  int32 limit = 3; // Default: 50, Max: 100
+  string page_token = 4;
+  bool include_user_info = 5;
+}
+
+message GetMutualFriendsResponse {
+  MutualFriend mutual_friend = 1;
+  string next_page_token = 2;
+  int32 total_count = 3; // Only in first response
+}
+
+// Request/Response messages for GetRecommendations
+message GetRecommendationsRequest {
+  string user_id = 1;
+  int32 limit = 2; // Default: 20, Max: 50
+  string page_token = 3;
+  double min_score = 4; // Minimum recommendation score
+  bool include_user_info = 5;
+}
+
+message GetRecommendationsResponse {
+  Recommendation recommendation = 1;
+  string next_page_token = 2;
+  int32 total_count = 3; // Only in first response
+}
+
+// Health check response
+message HealthCheckResponse {
+  string status = 1; // "SERVING" or "NOT_SERVING"
+  string message = 2;
+  google.protobuf.Timestamp timestamp = 3;
+}
+
+// Error handling
+message ErrorDetails {
+  string code = 1;
+  string message = 2;
+  map<string, string> details = 3;
+}
