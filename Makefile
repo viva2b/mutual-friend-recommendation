@@ -95,4 +95,7 @@ test-query: ## Query and analyze DynamoDB data
 test-grpc: ## Test gRPC client
 	go run cmd/grpc-client/main.go
 
+test-consumer: ## Test RabbitMQ event consumer
+	go run cmd/test-consumer/main.go
+
 .DEFAULT_GOAL := help

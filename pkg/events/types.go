@@ -153,17 +153,40 @@ func (e *RecommendationEvent) ToJSON() ([]byte, error) {
 
 // GetRoutingKey returns the routing key for the event
 func (e *FriendEvent) GetRoutingKey() string {
-	return string(e.Type) + "." + e.UserID
+	switch e.Type {
+	case EventTypeFriendAdded:
+		return "friend.added"
+	case EventTypeFriendRemoved:
+		return "friend.removed"
+	default:
+		return "friend.unknown"
+	}
 }
 
 // GetRoutingKey returns the routing key for the event
 func (e *UserEvent) GetRoutingKey() string {
-	return string(e.Type) + "." + e.UserID
+	switch e.Type {
+	case EventTypeUserCreated:
+		return "user.created"
+	case EventTypeUserUpdated:
+		return "user.updated"
+	case EventTypeUserDeleted:
+		return "user.deleted"
+	default:
+		return "user.unknown"
+	}
 }
 
 // GetRoutingKey returns the routing key for the event
 func (e *RecommendationEvent) GetRoutingKey() string {
-	return string(e.Type) + "." + e.UserID
+	switch e.Type {
+	case EventTypeRecommendationGenerated:
+		return "recommendation.generated"
+	case EventTypeRecommendationUpdated:
+		return "recommendation.updated"
+	default:
+		return "recommendation.unknown"
+	}
 }
 
 // generateEventID generates a unique event ID
