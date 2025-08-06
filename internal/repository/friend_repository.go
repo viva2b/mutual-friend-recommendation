@@ -251,3 +251,78 @@ func (r *FriendRepository) GetMutualFriends(ctx context.Context, userID1, userID
 
 	return mutualFriends, nil
 }
+
+// SaveRecommendations saves user recommendations to DynamoDB
+func (r *FriendRepository) SaveRecommendations(ctx context.Context, userID string, recommendations []domain.Recommendation) error {
+	// Create UserRecommendations object
+	userRecs := &domain.UserRecommendations{
+		UserID:          userID,
+		Recommendations: recommendations,
+		UpdatedAt:       time.Now(),
+		ExpiresAt:       time.Now().Add(24 * time.Hour),
+	}
+
+	// Create DynamoDB item
+	item := domain.DynamoDBItem{
+		PK:   domain.UserPK(userID),
+		SK:   domain.RecommendationSK(),
+		Type: domain.ItemTypeRecommendation,
+		Data: userRecs,
+		TTL:  aws.Int64(userRecs.ExpiresAt.Unix()), // Set TTL for automatic expiration
+	}
+
+	// Convert to DynamoDB attribute values
+	av, err := attributevalue.MarshalMap(item)
+	if err != nil {
+		return fmt.Errorf("failed to marshal recommendations: %w", err)
+	}
+
+	// Put item to DynamoDB
+	_, err = r.client.GetClient().PutItem(ctx, &dynamodb.PutItemInput{
+		TableName: aws.String(r.client.GetTableName()),
+		Item:      av,
+	})
+	if err != nil {
+		return fmt.Errorf("failed to save recommendations: %w", err)
+	}
+
+	return nil
+}
+
+// GetRecommendations retrieves user recommendations from DynamoDB
+func (r *FriendRepository) GetRecommendations(ctx context.Context, userID string) (*domain.UserRecommendations, error) {
+	result, err := r.client.GetClient().GetItem(ctx, &dynamodb.GetItemInput{
+		TableName: aws.String(r.client.GetTableName()),
+		Key: map[string]types.AttributeValue{
+			"PK": &types.AttributeValueMemberS{Value: domain.UserPK(userID)},
+			"SK": &types.AttributeValueMemberS{Value: domain.RecommendationSK()},
+		},
+	})
+	if err != nil {
+		return nil, fmt.Errorf("failed to get recommendations: %w", err)
+	}
+
+	if result.Item == nil {
+		return nil, nil // No recommendations found
+	}
+
+	var dbItem domain.DynamoDBItem
+	err = attributevalue.UnmarshalMap(result.Item, &dbItem)
+	if err != nil {
+		return nil, fmt.Errorf("failed to unmarshal item: %w", err)
+	}
+
+	// Extract recommendations data
+	recData, ok := dbItem.Data.(map[string]interface{})
+	if !ok {
+		return nil, fmt.Errorf("invalid recommendations data format")
+	}
+
+	var userRecs domain.UserRecommendations
+	err = attributevalue.UnmarshalMap(convertInterfaceToAttributeValue(recData), &userRecs)
+	if err != nil {
+		return nil, fmt.Errorf("failed to unmarshal recommendations: %w", err)
+	}
+
+	return &userRecs, nil
+}

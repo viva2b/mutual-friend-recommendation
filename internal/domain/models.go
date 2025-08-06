@@ -127,3 +127,11 @@ func NewRecommendation(userID, recommendedID string, mutualFriends []string, sco
 		UpdatedAt:        now,
 	}
 }
+
+// UserRecommendations represents a collection of recommendations for a user
+type UserRecommendations struct {
+	UserID          string           `json:"user_id" dynamodbav:"user_id"`
+	Recommendations []Recommendation `json:"recommendations" dynamodbav:"recommendations"`
+	UpdatedAt       time.Time        `json:"updated_at" dynamodbav:"updated_at"`
+	ExpiresAt       time.Time        `json:"expires_at" dynamodbav:"expires_at"`
+}
